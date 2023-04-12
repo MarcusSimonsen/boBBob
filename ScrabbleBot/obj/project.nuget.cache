@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "rPKALexqR+0piW7st9KF2itbb98FpGpSRUHhYFkAJVYgFJs1tEHvQU32IEGOUCTWbuc/LYMLhGn4Yb36tNujag==",
+  "success": true,
+  "projectFilePath": "/home/mons/ITU/FP/ScrabbleTemplate/ScrabbleBot/ScrabbleBot.fsproj",
+  "expectedPackageFiles": [
+    "/home/mons/.nuget/packages/fparsec/1.1.1/fparsec.1.1.1.nupkg.sha512",
+    "/home/mons/.nuget/packages/fsharp.core/7.0.200/fsharp.core.7.0.200.nupkg.sha512"
+  ],
+  "logs": []
+}
