@@ -48,13 +48,25 @@ module internal StateMonad
     let push : SM<unit> = 
         S (fun s -> Success ((), {s with vars = Map.empty :: s.vars}))
 
-    let pop : SM<unit> = failwith "Not implemented"      
+    let pop : SM<unit> = S (fun s ->
+        match s.vars with
+        | [] -> failwith "empty stack..."
+        | _ :: ms -> Success ((), { s with vars = ms }))
 
-    let wordLength : SM<int> = failwith "Not implemented"      
+    let wordLength : SM<int> =
+        S (fun s -> Success(s.word.Length, s))
 
-    let characterValue (pos : int) : SM<char> = failwith "Not implemented"      
+    let characterValue (pos : int) : SM<char> =
+        S (fun s ->
+            match evalSM s wordLength with
+            | Success wl when pos >= wl || pos < 0 -> Failure (IndexOutOfBounds pos)
+            | _ -> Success (fst s.word.[pos] , s))
 
-    let pointValue (pos : int) : SM<int> = failwith "Not implemented"      
+    let pointValue (pos : int) : SM<int> =
+        S (fun s ->
+            match evalSM s wordLength with
+            | Success wl when pos >= wl || pos < 0 -> Failure (IndexOutOfBounds pos)
+            | _ -> Success (snd s.word.[pos] , s)) 
 
     let lookup (x : string) : SM<int> = 
         let rec aux =
@@ -70,5 +82,29 @@ module internal StateMonad
               | Some v -> Success (v, s)
               | None   -> Failure (VarNotFound x))
 
-    let declare (var : string) : SM<unit> = failwith "Not implemented"   
-    let update (var : string) (value : int) : SM<unit> = failwith "Not implemented"      
+    let legalVarName (var : string) : SM<unit> =
+        S (fun s ->
+            if Set.contains var s.reserved
+            then Failure (ReservedName var)
+            else Success ((), s))
+    let declare (var : string) : SM<unit> =
+            var
+            |> legalVarName
+            >>>= S (fun s ->
+                    match Map.tryFind var s.vars.Head with
+                    | Some _ -> Failure (VarExists var)
+                    | None -> Success ((), {s with vars = Map.add var 0 s.vars.Head :: s.vars.Tail}))
+
+    let update (var : string) (value : int) : SM<unit> =
+        let rec aux =
+            function
+            | [] -> []
+            | m :: ms ->
+                match Map.tryFind var m with
+                | None -> m :: aux ms
+                | Some _ -> Map.add var value m :: ms
+        
+        S (fun s ->
+            match evalSM s (lookup var) with
+            | Success _ -> Success ((), {s with vars = aux s.vars})
+            | Failure err -> Failure err)
