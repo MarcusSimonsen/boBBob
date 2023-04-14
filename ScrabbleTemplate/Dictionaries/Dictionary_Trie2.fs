@@ -49,3 +49,5 @@ module Dictionary
         
         | Leaf (b) ->
             None
+
+    let reverse _ = failwith "Trie does not have reverse"

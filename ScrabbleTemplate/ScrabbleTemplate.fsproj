@@ -5,7 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="Dictionaries\English.txt" />
-    <Compile Include="Dictionaries/Dictionary_Trie2.fsi" />
+    <Compile Include="Dictionaries/Dictionary.fsi" />
     <Compile Include="Dictionaries/Dictionary_Trie2.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
