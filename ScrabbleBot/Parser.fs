@@ -64,12 +64,12 @@ module internal Parser
 
     let AddParse = binop (pchar '+') ProdParse TermParse |>> Add <?> "Add"
     let SubParse = binop (pchar '-') ProdParse TermParse |>> Sub <?> "Sub"
-    do tref := choice [AddParse; SubParse; ProdParse]
+    do tref.Value <- choice [AddParse; SubParse; ProdParse]
 
     let MulParse = binop (pchar '*') AtomParse ProdParse |>> Mul <?> "Mul"
     let DivParse = binop (pchar '/') AtomParse ProdParse |>> Div <?> "Div"
     let ModParse = binop (pchar '%') AtomParse ProdParse |>> Mod <?> "Mod"
-    do pref := choice [MulParse; DivParse; ModParse; AtomParse]
+    do pref.Value <- choice [MulParse; DivParse; ModParse; AtomParse]
 
     let VParse   = pid |>> V <?> "Variable"
     let NParse   = pint32 |>> N <?> "Int"
@@ -77,7 +77,7 @@ module internal Parser
     let NegParse = unop (pchar '-') AtomParse |>> (fun x -> (.*.) (N -1) x) <?> "Neg"
     let PVParse  = unop pPointValue ParParse |>> PV <?> "PointValue"
     let CharToIntParse = unop pCharToInt CharParse |>> CharToInt <?> "CharToInt"
-    do aref := choice [CharToIntParse; NegParse; ParParse; PVParse; VParse; NParse;]
+    do aref.Value <- choice [CharToIntParse; NegParse; ParParse; PVParse; VParse; NParse;]
 
     let AexpParse = TermParse 
 
@@ -87,10 +87,10 @@ module internal Parser
     let ToUpperParse    = unop pToUpper CharParse   |>> ToUpper     <?> "ToUpper"
     let ToLowerParse    = unop pToLower CharParse   |>> ToLower     <?> "ToLower"
     let IntToCharParse  = unop pIntToChar AtomParse |>> IntToChar   <?> "IntToChar"
-    do cref := choice [CParParse; IntToCharParse; ToUpperParse; ToLowerParse; CVParse; CParse;]
+    do cref.Value <- choice [CParParse; IntToCharParse; ToUpperParse; ToLowerParse; CVParse; CParse;]
 
     let CexpParse = CharParse
-
+//TODO: Marcus
     let BexpParse = pstring "not implemented"
 
     let stmParse = pstring "not implemented"

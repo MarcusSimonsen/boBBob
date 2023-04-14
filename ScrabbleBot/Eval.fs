@@ -3,9 +3,32 @@
 module internal Eval
 
     open StateMonad
+    open System.Text.RegularExpressions
 
-    let add a b = failwith "Not implemented"      
-    let div a b = failwith "Not implemented"      
+    let add a b = (
+        a >>= fun x ->
+        b >>= fun y ->
+        ret ((+) x y))
+    let div a b = (
+        a >>= fun x ->
+        b >>= fun y ->
+        if y <> 0
+        then ret ((/) x y)
+        else fail DivisionByZero)
+    let sub a b = (
+        a >>= fun x ->
+        b >>= fun y ->
+        ret ((-) x y))
+    let mul a b = (
+        a >>= fun x ->
+        b >>= fun y ->
+        ret (x * y))
+    let md_ a b = (
+        a >>= fun x ->
+        b >>= fun y ->
+        if y <> 0
+        then ret ((%) x y)
+        else fail DivisionByZero)
 
     type aExp =
         | N of int
@@ -57,12 +80,57 @@ module internal Eval
     let (.>=.) a b = ~~(a .<. b)                (* numeric greater than or equal to *)
     let (.>.) a b = ~~(a .=. b) .&&. (a .>=. b) (* numeric greater than *)    
 
-    let arithEval a : SM<int> = failwith "Not implemented"      
+    let rec arithEval a : SM<int> =
+        match a with
+        | N i -> ret i
+        | V v -> lookup v
+        | WL -> wordLength
+        | PV a -> arithEval a >>= pointValue
 
-    let charEval c : SM<char> = failwith "Not implemented"      
+        | Add (a, b) -> add (arithEval a) (arithEval b)
+        | Sub (a, b) -> sub (arithEval a) (arithEval b)
+        | Mul (a, b) -> mul (arithEval a) (arithEval b)
+        | Div (a, b) -> div (arithEval a) (arithEval b)
+        | Mod (a, b) -> md_ (arithEval a) (arithEval b)
 
-    let boolEval b : SM<bool> = failwith "Not implemented"
+        | CharToInt c -> charEval c >>= (int >> ret)
 
+    and charEval c : SM<char> =
+        match c with
+        | C c -> ret c
+        | CV a -> arithEval a >>= characterValue
+        | ToUpper c -> charEval c >>= (System.Char.ToUpper >> ret)
+        | ToLower c -> charEval c >>= (System.Char.ToLower >> ret)
+        | IntToChar a -> arithEval a >>= (char >> ret)
+
+
+    let rec boolEval b : SM<bool> =
+        match b with
+        | TT -> ret true
+        | FF -> ret false
+ 
+        | AEq (a, b) ->
+            arithEval a >>= fun x ->
+            arithEval b >>= fun y ->
+            ret (x = y)
+        | ALt (a, b) ->
+            arithEval a >>= fun x ->
+            arithEval b >>= fun y ->
+            ret (x < y)
+ 
+        | Not b -> boolEval b >>= (not >> ret)
+        | Conj (a, b) ->
+            boolEval a >>= fun x ->
+            boolEval b >>= fun y ->
+            ret (x && y)
+        
+        | IsVowel c -> 
+            let rx = Regex (@"[aeiouy]", RegexOptions.Compiled)
+            charEval c >>= fun c' ->
+                ret (rx.IsMatch(string (System.Char.ToLower c')))
+        | IsConsonant c ->
+            boolEval ((~~) (IsVowel c)) >>= fun x ->
+            ret (x)
 
     type stm =                (* statements *)
     | Declare of string       (* variable declaration *)
@@ -72,10 +140,21 @@ module internal Eval
     | ITE of bExp * stm * stm (* if-then-else statement *)
     | While of bExp * stm     (* while statement *)
 
-    let rec stmntEval stmnt : SM<unit> = failwith "Not implemented"
+    let rec stmntEval stmnt : SM<unit> = 
+        match stmnt with
+        | Declare var -> declare var
+        | Ass (var, value) -> arithEval value >>= update var
+        | Skip -> ret ()
+        | Seq (stmnt1, stmnt2) -> stmntEval stmnt1 >>>= stmntEval stmnt2
+        | ITE (bExp, stmnt1, stmnt2) ->
+            boolEval bExp >>= fun condition ->
+            if condition
+            then push >>>= stmntEval stmnt1
+            else pop >>>= stmntEval stmnt2
+        | While (bExp, stmnt) -> stmntEval (ITE (bExp, (stmntEval (While (bExp, stmnt)) |> ignore; While (bExp, stmnt)), Skip))
 
 (* Part 3 (Optional) *)
-
+//TODO: Maybe change to StateBuilder system
     type StateBuilder() =
 
         member this.Bind(f, x)    = f >>= x
@@ -86,13 +165,8 @@ module internal Eval
         
     let prog = new StateBuilder()
 
-    let arithEval2 a = failwith "Not implemented"
-    let charEval2 c = failwith "Not implemented"
-    let rec boolEval2 b = failwith "Not implemented"
-
-    let stmntEval2 stm = failwith "Not implemented"
-
-(* Part 4 *) 
+(* Part 4 *)
+//TODO: Magnus will look at this
 
     type word = (char * int) list
     type squareFun = word -> int -> int -> Result<int, Error>
