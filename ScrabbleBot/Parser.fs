@@ -43,6 +43,7 @@ module internal Parser
     let (>*>.) p1 p2  = p1 .>> spaces >>. p2
 
     let parenthesise p = pchar '(' >*>. p .>*> pchar ')'
+    let apostrophize p = pchar ''' >*>. p .>*> pchar '''
 
     let pid =
         pchar '_' <|> pletter
@@ -73,11 +74,22 @@ module internal Parser
     let VParse   = pid |>> V <?> "Variable"
     let NParse   = pint32 |>> N <?> "Int"
     let ParParse = parenthesise TermParse
-    do aref := choice [NParse; ParParse]
+    let NegParse = unop (pchar '-') AtomParse |>> (fun x -> (.*.) (N -1) x) <?> "Neg"
+    let PVParse  = unop pPointValue ParParse |>> PV <?> "PointValue"
+    let CharToIntParse = unop pCharToInt CharParse |>> CharToInt <?> "CharToInt"
+    do aref := choice [CharToIntParse; NegParse; ParParse; PVParse; VParse; NParse;]
 
     let AexpParse = TermParse 
 
-    let CexpParse = pstring "not implemented"
+    let CParParse       = parenthesise CharParse
+    let CParse          = apostrophize (pletter <|> whitespaceChar) |>> C <?> "C"
+    let CVParse         = unop pCharValue AtomParse |>> CV          <?> "CV"
+    let ToUpperParse    = unop pToUpper CharParse   |>> ToUpper     <?> "ToUpper"
+    let ToLowerParse    = unop pToLower CharParse   |>> ToLower     <?> "ToLower"
+    let IntToCharParse  = unop pIntToChar AtomParse |>> IntToChar   <?> "IntToChar"
+    do cref := choice [CParParse; IntToCharParse; ToUpperParse; ToLowerParse; CVParse; CParse;]
+
+    let CexpParse = CharParse
 
     let BexpParse = pstring "not implemented"
 
