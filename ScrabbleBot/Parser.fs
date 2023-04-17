@@ -65,6 +65,12 @@ module internal Parser
             |> System.String)
         <?> "identifier"
     
+    let stringTobExp (s : string) =
+        match s with
+        | "true" -> TT
+        | "false" -> FF
+        | _ -> failwith "Unknown input error"
+    
     let unop op a    = op >*>. a
     let binop op a b = a .>*> op .>*>. b
 
@@ -125,7 +131,9 @@ module internal Parser
     let IsLetterParse   = unop pIsLetter CharParse  |>> IsLetter <?> "IsLetter"
     let IsVowelParse    = unop pIsVowel  CharParse  |>> IsVowel  <?> "IsVowel"
     let IsDigitParse    = unop pIsDigit  CharParse  |>> IsDigit  <?> "IsDigit"
-    do bref.Value <- choice [BParParse; BNParse; IsLetterParse; IsVowelParse; IsDigitParse;]
+    let TrueParse       = pTrue  |>> stringTobExp <?> "TT"
+    let FalseParse      = pFalse |>> stringTobExp <?> "FF"
+    do bref.Value <- choice [BParParse; BNParse; IsLetterParse; IsVowelParse; IsDigitParse; TrueParse; FalseParse;]
 
     let AexpParse = TermParse 
     let CexpParse = CharParse
