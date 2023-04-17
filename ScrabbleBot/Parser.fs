@@ -123,7 +123,7 @@ module internal Parser
     let LTEParse = binop plte TermParse TermParse |>> ALte <?> "ALte"
     let GTParse  = binop pgt  TermParse TermParse |>> AGt  <?> "AGt"
     let GTEParse = binop pgte TermParse TermParse |>> AGte <?> "AGte"
-    do eref.Value <- choice [NEqParse; LTEParse; GTEParse; EqParse; LTParse; GTParse;]
+    do eref.Value <- choice [NEqParse; LTEParse; GTEParse; EqParse; LTParse; GTParse; BoolParse;]
 
     // Boolean Parsing
     let BParParse       = parenthesise GateParse
