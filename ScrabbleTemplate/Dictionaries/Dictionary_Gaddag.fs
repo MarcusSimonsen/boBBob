@@ -2,66 +2,61 @@ module Dictionary
     type Val =
         | C of char
         | N
-    type Dictionary =
+    type Dict =
         | Leaf of bool
-        | Node of bool * Map<Val, Dictionary>
+        | Node of bool * Map<Val, Dict>
 
     let empty () = Leaf false
 
-    let c2v : char -> Val = fun c ->
+    let c2v : char -> Val = fun (c : char) ->
         match c with
         | c when c = char 0 -> N
         | c -> C c
 
-    let rec ins s dict =
+    let rec ins (s : string) (dict : Dict) =
         match dict with
-        // End of string
-        | Leaf _        when s = "" -> Leaf true
-        | Node (_, map) when s = "" -> Node (true, map)
-
-        // 1 char left
-        | Leaf b        when s.Substring 1 = "" ->
-            Node (b, Map [c2v s.[0], ins (s.Substring 1) (empty ())])
-        | Node (b, map) when s.Substring 1 = "" ->
-            Node (b, map.Add (c2v s.[0], ins (s.Substring 1) (
-                match map.ContainsKey (c2v s.[0]) with
-                | true -> Map.find (c2v s.[0]) map
-                | false -> empty ())))
-
-        // >1 chars left
-        | Leaf b ->
-            Node (b, Map [c2v s.[0], ins (s.Substring 1) (empty ())])
-        | Node (b, map) ->
-            Node (b, map.Add (c2v s.[0], ins (s.Substring 1) (
-                match map.ContainsKey (c2v s.[0]) with
-                | true -> Map.find (c2v s.[0]) map
-                | false -> empty ())))
+        | Leaf _ when String.length s = 0 -> Leaf true
+        | Leaf isWord -> Node (isWord, Map [(c2v s.[0], ins s.[1..] (Leaf false))])
+        | Node (_, children) when s.Length = 0 -> Node(true, children)
+        | Node (isWord,children) -> 
+            match children.TryFind (c2v s.[0]) with
+            | None -> Node (isWord, children.Add (c2v s.[0], ins s.[1..] (Leaf false)))
+            | Some child -> 
+                Node(isWord, children.Add(c2v s.[0], ins s.[1..] child))
 
     let reverseS : string -> string =
         Seq.rev
         >> Seq.toArray
         >> System.String
 
-    let insert (s : string) (dict : Dictionary) =
-        List.fold (fun (acc, i) _ -> (ins ((reverseS s.[0..i]) + string (char 0) + (s.Substring 1)) acc, i+1)) (dict, 1) (Seq.toList s)
+    let insert (s : string) (dict : Dict) =
+        List.fold (fun (acc, i) _ -> (ins ((reverseS s.[0..i]) + string (char 0) + (s.Substring (i+1))) acc, i+1)) (dict, 0) (Seq.toList s)
         |> fst
 
-    let step (c : char) (dict : Dictionary) =
+    let step (c : char) (dict : Dict) =
         match dict with
-        | Node (_, map) when Map.containsKey (c2v c) map ->
-            match map.[c2v c] with
-            | Node (b, map) -> Some (b, Node (b, map))
-            | Leaf _ -> None
-        | Node _
         | Leaf _ -> None
-        
-    let reverse (dict : Dictionary) =
+        | Node (_, children) -> 
+            match children.TryFind (c2v c) with
+            | None -> None
+            | Some child -> 
+                match child with
+                | Leaf isWord -> Some (isWord, child)
+                | Node (isWord, _) -> Some (isWord, child)
+
+    let reverse (dict : Dict) =
         match dict with
         | Node (_, map) ->
-            match Map.containsKey (c2v (char 0)) map with
-            | true ->
-                match map.[c2v (char 0)] with
-                | Node (b, _) -> Some (b, map.[c2v (char 0)])
-                | Leaf _ -> None
+            match Map.containsKey (char 0 |> c2v) map with
+            | true -> Some ((
+                match map.[char 0 |> c2v] with
+                | Node (b, _) -> b
+                | Leaf b -> b)
+                , map.[char 0 |> c2v])
             | false -> None
         | Leaf _ -> None
+    
+    let debugKeys (dict : Dict) =
+        match dict with
+        | Node (_, map) -> Map.toList map |> List.fold (fun acc e -> acc + (string e)) ""
+        | Leaf _ -> "Dict is Leaf, therefore no keys"

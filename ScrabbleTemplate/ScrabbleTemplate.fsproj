@@ -6,7 +6,7 @@
   <ItemGroup>
     <Content Include="Dictionaries\English.txt" />
     <Compile Include="Dictionaries/Dictionary.fsi" />
-    <Compile Include="Dictionaries/Dictionary_Trie.fs" />
+    <Compile Include="Dictionaries/Dictionary_Gaddag.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
   <ItemGroup>
