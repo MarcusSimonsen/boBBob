@@ -166,12 +166,13 @@ module internal Eval
     let prog = new StateBuilder()
 
 (* Part 4 *)
-//TODO: Magnus will look at this
-
+    //TODO: 6.12
     type word = (char * int) list
     type squareFun = word -> int -> int -> Result<int, Error>
 
-    let stmntToSquareFun stm = failwith "Not implemented"
+    let stmntToSquareFun stm = fun w pos acc  -> 
+        let initialState = mkState [("_pos_", pos); ("_acc_", acc); ("_result_", 0)] w ["_pos_"; "_acc_";"_result_"]
+        initialState
 
 
     type coord = int * int
