@@ -35,6 +35,17 @@ module internal Parser
     let pletter        = satisfy System.Char.IsLetter <?> "letter"
     let palphanumeric  = satisfy System.Char.IsLetterOrDigit <?> "alphanumeric"
 
+    // Boolean symbol parsing
+    let pand    = pstring "/\\"
+    let por     = pstring "\\/"
+    let peq     = pstring "="
+    let pneq    = pstring "<>"
+    let plt     = pstring "<"
+    let plte    = pstring "<="
+    let pgt     = pstring ">"
+    let pgte    = pstring ">="
+    let pnot    = pstring "~"
+
     let spaces         = many whitespaceChar <?> "spaces"
     let spaces1        = many1 whitespaceChar <?> "spaces1"
 
@@ -54,6 +65,12 @@ module internal Parser
             |> System.String)
         <?> "identifier"
     
+    let stringTobExp (s : string) =
+        match s with
+        | "true" -> TT
+        | "false" -> FF
+        | _ -> failwith "Unknown input error"
+    
     let unop op a    = op >*>. a
     let binop op a b = a .>*> op .>*>. b
 
@@ -61,16 +78,22 @@ module internal Parser
     let ProdParse, pref = createParserForwardedToRef<aExp>()
     let AtomParse, aref = createParserForwardedToRef<aExp>()
     let CharParse, cref = createParserForwardedToRef<cExp>()
+    let GateParse, gref = createParserForwardedToRef<bExp>()
+    let EquaParse, eref = createParserForwardedToRef<bExp>()
+    let BoolParse, bref = createParserForwardedToRef<bExp>()
 
+    // Arith parser level 1
     let AddParse = binop (pchar '+') ProdParse TermParse |>> Add <?> "Add"
     let SubParse = binop (pchar '-') ProdParse TermParse |>> Sub <?> "Sub"
     do tref.Value <- choice [AddParse; SubParse; ProdParse]
 
+    // Arith parser level 2
     let MulParse = binop (pchar '*') AtomParse ProdParse |>> Mul <?> "Mul"
     let DivParse = binop (pchar '/') AtomParse ProdParse |>> Div <?> "Div"
     let ModParse = binop (pchar '%') AtomParse ProdParse |>> Mod <?> "Mod"
     do pref.Value <- choice [MulParse; DivParse; ModParse; AtomParse]
 
+    // Arith parser level 3
     let VParse   = pid |>> V <?> "Variable"
     let NParse   = pint32 |>> N <?> "Int"
     let ParParse = parenthesise TermParse
@@ -79,8 +102,7 @@ module internal Parser
     let CharToIntParse = unop pCharToInt CharParse |>> CharToInt <?> "CharToInt"
     do aref.Value <- choice [CharToIntParse; NegParse; ParParse; PVParse; VParse; NParse;]
 
-    let AexpParse = TermParse 
-
+    // Char parsing
     let CParParse       = parenthesise CharParse
     let CParse          = apostrophize (pletter <|> whitespaceChar) |>> C <?> "C"
     let CVParse         = unop pCharValue AtomParse |>> CV          <?> "CV"
@@ -89,11 +111,35 @@ module internal Parser
     let IntToCharParse  = unop pIntToChar AtomParse |>> IntToChar   <?> "IntToChar"
     do cref.Value <- choice [CParParse; IntToCharParse; ToUpperParse; ToLowerParse; CVParse; CParse;]
 
-    let CexpParse = CharParse
-//TODO: Marcus
-    let BexpParse = pstring "not implemented"
+    // Logic Gates Parsing
+    let AndGParse   = binop pand GateParse GateParse |>> Conj <?> "Conj"
+    let OrGParse    = binop por  GateParse GateParse |>> Disj <?> "Disj"
+    do gref.Value <- choice [AndGParse; OrGParse; EquaParse;]
 
+    // Comparison(equality) Parsing
+    let EqParse  = binop peq  TermParse TermParse |>> AEq  <?> "AEq"
+    let NEqParse = binop pneq TermParse TermParse |>> ANEq <?> "ANEq"
+    let LTParse  = binop plt  TermParse TermParse |>> ALt  <?> "ALt"
+    let LTEParse = binop plte TermParse TermParse |>> ALte <?> "ALte"
+    let GTParse  = binop pgt  TermParse TermParse |>> AGt  <?> "AGt"
+    let GTEParse = binop pgte TermParse TermParse |>> AGte <?> "AGte"
+    do eref.Value <- choice [NEqParse; LTEParse; GTEParse; EqParse; LTParse; GTParse; BoolParse;]
+
+    // Boolean Parsing
+    let BParParse       = parenthesise GateParse
+    let BNParse         = unop pnot BParParse       |>> Not      <?> "Not"
+    let IsLetterParse   = unop pIsLetter CharParse  |>> IsLetter <?> "IsLetter"
+    let IsVowelParse    = unop pIsVowel  CharParse  |>> IsVowel  <?> "IsVowel"
+    let IsDigitParse    = unop pIsDigit  CharParse  |>> IsDigit  <?> "IsDigit"
+    let TrueParse       = pTrue  |>> stringTobExp <?> "TT"
+    let FalseParse      = pFalse |>> stringTobExp <?> "FF"
+    do bref.Value <- choice [BParParse; BNParse; IsLetterParse; IsVowelParse; IsDigitParse; TrueParse; FalseParse;]
+
+    let AexpParse = TermParse 
+    let CexpParse = CharParse
+    let BexpParse = GateParse
     let stmParse = pstring "not implemented"
+
 
     (* The rest of your parser goes here *)
     type word   = (char * int) list

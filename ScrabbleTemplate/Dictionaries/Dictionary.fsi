@@ -1,10 +1,10 @@
 module Dictionary
-    type Dictionary
+    type Dict
         val empty:
-            unit -> Dictionary
+            unit -> Dict
         val insert:
-            string -> Dictionary -> Dictionary
+            string -> Dict -> Dict
         val step:
-            char -> Dictionary -> (bool * Dictionary) option
+            char -> Dict -> (bool * Dict) option
         val reverse:
-            Dictionary -> (bool * Dictionary) option
+            Dict -> (bool * Dict) option

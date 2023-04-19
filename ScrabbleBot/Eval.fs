@@ -53,14 +53,21 @@ module internal Eval
        | TT                   (* true *)
        | FF                   (* false *)
 
-       | AEq of aExp * aExp   (* numeric equality *)
-       | ALt of aExp * aExp   (* numeric less than *)
+       | AEq  of aExp * aExp (* numeric equality *)
+       | ANEq of aExp * aExp (* numeric inequality *)
+       | ALt  of aExp * aExp (* numeric less than *)
+       | ALte of aExp * aExp (* numeric less than or equal to *)
+       | AGt  of aExp * aExp (* numeric greater than *)
+       | AGte of aExp * aExp (* numeric greather than or equal to *)
 
        | Not of bExp          (* boolean not *)
        | Conj of bExp * bExp  (* boolean conjunction *)
+       | Disj of bExp * bExp  (* boolean disjunction *)
 
        | IsVowel of cExp      (* check for vowel *)
        | IsConsonant of cExp  (* check for constant *)
+       | IsLetter of cExp     (* check for letter *)
+       | IsDigit of cExp      (* check for digit *)
 
     let (.+.) a b = Add (a, b)
     let (.-.) a b = Sub (a, b)
@@ -113,16 +120,36 @@ module internal Eval
             arithEval a >>= fun x ->
             arithEval b >>= fun y ->
             ret (x = y)
+        | ANEq (a, b) ->
+            arithEval a >>= fun x ->
+            arithEval b >>= fun y ->
+            ret (x <> y)
         | ALt (a, b) ->
             arithEval a >>= fun x ->
             arithEval b >>= fun y ->
             ret (x < y)
- 
+        | ALte (a, b) ->
+            arithEval a >>= fun x ->
+            arithEval b >>= fun y ->
+            ret (x <= y)
+        | AGt (a, b) ->
+            arithEval a >>= fun x ->
+            arithEval b >>= fun y ->
+            ret (x > y)
+        | AGte (a, b) ->
+            arithEval a >>= fun x ->
+            arithEval b >>= fun y ->
+            ret (x >= y)
+
         | Not b -> boolEval b >>= (not >> ret)
         | Conj (a, b) ->
             boolEval a >>= fun x ->
             boolEval b >>= fun y ->
             ret (x && y)
+        | Disj (a, b) ->
+            boolEval a >>= fun x ->
+            boolEval b >>= fun y ->
+            ret (x || y)
         
         | IsVowel c -> 
             let rx = Regex (@"[aeiouy]", RegexOptions.Compiled)
@@ -130,7 +157,13 @@ module internal Eval
                 ret (rx.IsMatch(string (System.Char.ToLower c')))
         | IsConsonant c ->
             boolEval ((~~) (IsVowel c)) >>= fun x ->
-            ret (x)
+            ret x
+        | IsLetter c ->
+            boolEval ((.||.) (IsVowel c) (IsConsonant c)) >>= fun x ->
+            ret x
+        | IsDigit c ->
+            charEval c >>= fun c' ->
+                ret (System.Char.IsDigit c')
 
     type stm =                (* statements *)
     | Declare of string       (* variable declaration *)

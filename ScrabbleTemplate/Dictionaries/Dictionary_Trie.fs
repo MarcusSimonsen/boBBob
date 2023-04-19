@@ -37,4 +37,4 @@ module Dictionary
                 | Leaf isWord -> Some (isWord, child)
                 | Node (isWord, _) -> Some (isWord, child)
 
-    let reverse _ = failwith "Trie does not have reverse"
+    let reverse (_:Dict) = Some (false, empty ())
