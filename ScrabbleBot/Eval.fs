@@ -203,10 +203,11 @@ module internal Eval
     type word = (char * int) list
     type squareFun = word -> int -> int -> Result<int, Error>
 
-    let stmntToSquareFun stm = fun w pos acc  -> 
-        let initialState = mkState [("_pos_", pos); ("_acc_", acc); ("_result_", 0)] w ["_pos_"; "_acc_";"_result_"]
-        initialState
-
+    let stmntToSquareFun stm = 
+        fun w pos acc -> 
+            stmntEval stm >>>=
+            lookup "_result_" |>
+            evalSM (mkState [("_pos_", pos); ("_acc_", acc); ("_result_", 0)] w ["_pos_"; "_acc_";"_result_"])
 
     type coord = int * int
 
