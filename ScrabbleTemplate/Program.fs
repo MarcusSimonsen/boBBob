@@ -57,6 +57,7 @@ let main argv =
 
     let players = spawnMultiples "OxyphenButazone" dictionary Oxyphenbutazone.Scrabble.startGame 2
 
+    // ExpressionTesting.testAllParsers ()
 
     do ScrabbleServer.Comm.startGame 
           board dictionary handSize timeout tiles seed port players
