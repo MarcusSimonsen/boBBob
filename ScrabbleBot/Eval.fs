@@ -184,7 +184,11 @@ module internal Eval
             if condition
             then push >>>= stmntEval stmnt1
             else pop >>>= stmntEval stmnt2
-        | While (bExp, stmnt) -> stmntEval (ITE (bExp, (stmntEval (While (bExp, stmnt)) |> ignore; While (bExp, stmnt)), Skip))
+        | While (bExp, stmnt) ->
+            boolEval bExp >>= fun condition ->
+            if condition
+            then stmntEval stmnt |> ignore; stmntEval (While (bExp, stmnt))
+            else stmntEval Skip
 
 (* Part 3 (Optional) *)
 //TODO: Maybe change to StateBuilder system
