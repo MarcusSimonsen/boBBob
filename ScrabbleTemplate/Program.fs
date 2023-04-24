@@ -51,12 +51,13 @@ let main argv =
         // Some (Dictionary.empty, Dictionary.insert, Dictionary.step, None)
 
     // Uncomment this line to call your client
-    // let players    = [("Your name here", YourClientName.Scrabble.startGame)]
     let (dictionary, time) =
         time (fun () -> ScrabbleUtil.Dictionary.mkDict words dictAPI)
 
-    let players = spawnMultiples "OxyphenButazone" dictionary Oxyphenbutazone.Scrabble.startGame 2
+    let players    = [("boBBob", dictionary, boBBob.Scrabble.startGame)]
+    // let players = spawnMultiples "OxyphenButazone" dictionary Oxyphenbutazone.Scrabble.startGame 2
 
+    // ExpressionTesting.testAllParsers ()
 
     do ScrabbleServer.Comm.startGame 
           board dictionary handSize timeout tiles seed port players

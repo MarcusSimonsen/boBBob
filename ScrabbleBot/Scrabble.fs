@@ -1,4 +1,4 @@
-﻿namespace YourClientName
+﻿namespace boBBob
 
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
@@ -65,8 +65,11 @@ module Scrabble =
 
             // remove the force print when you move on from manual input (or when you have learnt the format)
             forcePrint "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
+            forcePrint (sprintf "Default square used: %A\n\n" st.board.defaultSquare)
             let input =  System.Console.ReadLine()
             let move = RegEx.parseMove input
+
+            // Search for move
 
             debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
             send cstream (SMPlay move)
@@ -77,7 +80,12 @@ module Scrabble =
             match msg with
             | RCM (CMPlaySuccess(ms, points, newPieces)) ->
                 (* Successful play by you. Update your state (remove old tiles, add the new ones, change turn, etc) *)
-                let st' = st // This state needs to be updated
+                forcePrint "Successfull move!\n"
+                // let st' = st // This state needs to be updated
+                let st' = {st with hand = (List.fold (fun acc (_, (cid, _)) -> MultiSet.removeSingle cid acc) st.hand ms
+                            |> (fun hand -> List.fold (fun acc (cid, amount) -> MultiSet.add cid amount acc) hand newPieces))}
+                // Update board
+                // ...
                 aux st'
             | RCM (CMPlayed (pid, ms, points)) ->
                 (* Successful play by other player. Update your state *)
@@ -112,8 +120,8 @@ module Scrabble =
                       hand =  %A
                       timeout = %A\n\n" numPlayers playerNumber playerTurn hand timeout)
 
-        //let dict = dictf true // Uncomment if using a gaddag for your dictionary
-        let dict = dictf false // Uncomment if using a trie for your dictionary
+        let dict = dictf true // Uncomment if using a gaddag for your dictionary
+        // let dict = dictf false // Uncomment if using a trie for your dictionary
         let board = Parser.mkBoard boardP
                   
         let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
