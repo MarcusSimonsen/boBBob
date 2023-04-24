@@ -84,7 +84,8 @@ module Scrabble =
                 // let st' = st // This state needs to be updated
                 let st' = {st with hand = (List.fold (fun acc (_, (cid, _)) -> MultiSet.removeSingle cid acc) st.hand ms
                             |> (fun hand -> List.fold (fun acc (cid, amount) -> MultiSet.add cid amount acc) hand newPieces))}
-                // let st' = {st' with board = }
+                // Update board
+                // ...
                 aux st'
             | RCM (CMPlayed (pid, ms, points)) ->
                 (* Successful play by other player. Update your state *)
