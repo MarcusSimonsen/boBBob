@@ -84,8 +84,8 @@ module internal Parser
     let GateParse, gref = createParserForwardedToRef<bExp>()
     let EquaParse, eref = createParserForwardedToRef<bExp>()
     let BoolParse, bref = createParserForwardedToRef<bExp>()
-    let CondParse, dref = createParserForwardedToRef<stm>()
-    let StmnParse, sref = createParserForwardedToRef<stm>()
+    let CondParse, dref = createParserForwardedToRef<stmnt>()
+    let StmnParse, sref = createParserForwardedToRef<stmnt>()
 
     // Arith parser level 1 (Term)
     let AddParse = binop (pchar '+') ProdParse TermParse |>> Add <?> "Add"
@@ -178,6 +178,7 @@ module internal Parser
         defaultSquare : square
         squares       : boardFun2
     }
-    
+
+
     // Default (unusable) board in case you are not implementing a parser for the DSL.
     let mkBoard : boardProg -> board = fun _ -> {center = (0,0); defaultSquare = Map.empty; squares = fun _ -> Success (Some Map.empty)}
