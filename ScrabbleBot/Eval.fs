@@ -165,15 +165,15 @@ module internal Eval
             charEval c >>= fun c' ->
                 ret (System.Char.IsDigit c')
 
-    type stm =                (* statements *)
+    type stmnt =                (* statements *)
     | Declare of string       (* variable declaration *)
     | Ass of string * aExp    (* variable assignment *)
     | Skip                    (* nop *)
-    | Seq of stm * stm        (* sequential composition *)
-    | ITE of bExp * stm * stm (* if-then-else statement *)
-    | While of bExp * stm     (* while statement *)
+    | Seq of stmnt * stmnt        (* sequential composition *)
+    | ITE of bExp * stmnt * stmnt (* if-then-else statement *)
+    | While of bExp * stmnt     (* while statement *)
 
-    let rec stmntEval stmnt : SM<unit> = 
+    let rec stmntEval stmnt : SM<unit> =
         match stmnt with
         | Declare var -> declare var
         | Ass (var, value) -> arithEval value >>= update var
@@ -181,13 +181,16 @@ module internal Eval
         | Seq (stmnt1, stmnt2) -> stmntEval stmnt1 >>>= stmntEval stmnt2
         | ITE (bExp, stmnt1, stmnt2) ->
             boolEval bExp >>= fun condition ->
-            if condition
-            then push >>>= stmntEval stmnt1
-            else pop >>>= stmntEval stmnt2
-        | While (bExp, stmnt) ->
+            push
+            >>>= stmntEval (
+                if condition
+                then stmnt1
+                else stmnt2)
+            >>>= pop
+        | While (bExp, stmnt) as wh ->
             boolEval bExp >>= fun condition ->
             if condition
-            then stmntEval stmnt |> ignore; stmntEval (While (bExp, stmnt))
+            then push >>>= stmntEval stmnt >>>= pop >>>= stmntEval wh
             else stmntEval Skip
 
 (* Part 3 (Optional) *)
@@ -203,24 +206,4 @@ module internal Eval
     let prog = new StateBuilder()
 
 (* Part 4 *)
-//TODO: Magnus will look at this
-
-    type word = (char * int) list
-    type squareFun = word -> int -> int -> Result<int, Error>
-
-    let stmntToSquareFun stm = failwith "Not implemented"
-
-
-    type coord = int * int
-
-    type boardFun = coord -> Result<squareFun option, Error> 
-
-    let stmntToBoardFun stm m = failwith "Not implemented"
-
-    type board = {
-        center        : coord
-        defaultSquare : squareFun
-        squares       : boardFun
-    }
-
-    let mkBoard c defaultSq boardStmnt ids = failwith "Not implemented"
+    //TODO: 6.12
