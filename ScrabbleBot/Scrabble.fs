@@ -55,6 +55,15 @@ module State =
     let playerNumber st  = st.playerNumber
     let hand st          = st.hand
 
+    let removeTiles : (coord * (uint32 * (char * int))) list -> state -> state = fun tilesToRemove st ->
+        {st with hand = List.fold (fun acc (_, (cid, _)) -> MultiSet.removeSingle cid acc) st.hand tilesToRemove}
+    
+    let addTiles : (uint32 * uint32) list -> state -> state = fun newTiles st ->
+        {st with hand = List.fold (fun acc (cid, amount) -> MultiSet.add cid amount acc) st.hand newTiles}
+
+    // let addToBoard : (coord * (uint32 * (char * int))) list -> state -> state = fun tiles st ->
+    //     {st with board = }
+
 module Scrabble =
     open System.Threading
 
@@ -80,10 +89,10 @@ module Scrabble =
             match msg with
             | RCM (CMPlaySuccess(ms, points, newPieces)) ->
                 (* Successful play by you. Update your state (remove old tiles, add the new ones, change turn, etc) *)
-                forcePrint "Successfull move!\n"
-                // let st' = st // This state needs to be updated
-                let st' = {st with hand = (List.fold (fun acc (_, (cid, _)) -> MultiSet.removeSingle cid acc) st.hand ms
-                            |> (fun hand -> List.fold (fun acc (cid, amount) -> MultiSet.add cid amount acc) hand newPieces))}
+                let st' =
+                    st
+                    |> State.removeTiles ms     // Remove used tiles from hand
+                    |> State.addTiles newPieces // Add new tiles to hand
                 // Update board
                 // ...
                 aux st'
@@ -120,10 +129,9 @@ module Scrabble =
                       hand =  %A
                       timeout = %A\n\n" numPlayers playerNumber playerTurn hand timeout)
 
-        let dict = dictf true // Uncomment if using a gaddag for your dictionary
-        // let dict = dictf false // Uncomment if using a trie for your dictionary
+        let dict = dictf true // Cause Gaddag
         let board = Parser.mkBoard boardP
-                  
+
         let handSet = List.fold (fun acc (x, k) -> MultiSet.add x k acc) MultiSet.empty hand
 
         fun () -> playGame cstream tiles (State.mkState board dict playerNumber handSet)

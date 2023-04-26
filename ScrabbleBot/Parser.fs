@@ -170,15 +170,34 @@ module internal Parser
     type word   = (char * int) list
     type squareFun = word -> int -> int -> Result<int, Error>
     type square = Map<int, squareFun>
+    type coord = int * int
     
-    type boardFun2 = coord -> Result<square option, Error>
+    type boardFun = coord -> Result<square option, Error>
+    type squareProg = Map<int, string>
+    type squareStmnt = Map<int, stmnt>
         
     type board = {
         center        : coord
         defaultSquare : square
-        squares       : boardFun2
+        squares       : boardFun
     }
 
+    let stmntToSquareFun : stmnt -> squareFun = fun stm ->
+        fun w pos acc -> 
+            stmntEval stm >>>=
+            lookup "_result_" |>
+            evalSM (mkState [("_pos_", pos); ("_acc_", acc); ("_result_", 0)] w ["_pos_"; "_acc_";"_result_"])
+
+    let stmntsToSquare : Map<int, stmnt> -> Map<int, squareFun> = Map.map (fun _ value -> stmntToSquareFun value)
+
+    let stmntToBoardFun : stmnt -> Map<int, 'a> -> coord -> Result<'a option, Error> = fun stm t (x, y) ->
+        stmntEval stm >>>=
+        lookup "_result_"
+        |> evalSM (mkState [("_x_", x); ("_y_", y); ("_result_", 0)] [] ["_x_"; "_y_"; "_result_"])
+        |> (fun id ->
+            match id with
+            | Success id -> Success (Map.tryFind id t)
+            | Failure err -> Failure err)
 
     // Default (unusable) board in case you are not implementing a parser for the DSL.
-    let mkBoard : boardProg -> board = fun _ -> {center = (0,0); defaultSquare = Map.empty; squares = fun _ -> Success (Some Map.empty)}
+    let mkBoard : boardProg -> board = fun bp -> {center = (0,0); defaultSquare = Map.empty; squares = fun _ -> Success (Some Map.empty)}

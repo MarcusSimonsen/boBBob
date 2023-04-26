@@ -207,34 +207,3 @@ module internal Eval
 
 (* Part 4 *)
     //TODO: 6.12
-    type word = (char * int) list
-    type squareFun = word -> int -> int -> Result<int, Error>
-
-    let stmntToSquareFun : stmnt -> squareFun = fun stm ->
-        fun w pos acc -> 
-            stmntEval stm >>>=
-            lookup "_result_" |>
-            evalSM (mkState [("_pos_", pos); ("_acc_", acc); ("_result_", 0)] w ["_pos_"; "_acc_";"_result_"])
-
-    type coord = int * int
-
-    type boardFun = coord -> Result<squareFun option, Error> 
-
-    let stmntsToSquare : Map<int, stmnt> -> Map<int, squareFun> = Map.map (fun _ value -> stmntToSquareFun value)
-
-    let stmntToBoardFun : stmnt -> Map<int, 'a> -> coord -> Result<'a option, Error> = fun stm t (x, y) ->
-        stmntEval stm >>>=
-        lookup "_result_"
-        |> evalSM (mkState [("_x_", x); ("_y_", y); ("_result_", 0)] [] ["_x_"; "_y_"; "_result_"])
-        |> (fun id ->
-            match id with
-            | Success id -> Success (Map.tryFind id t)
-            | Failure err -> Failure err)
-
-    type board = {
-        center        : coord
-        defaultSquare : squareFun
-        squares       : boardFun
-    }
-
-    let mkBoard c defaultSq boardStmnt ids = failwith "Not implemented"
