@@ -1,6 +1,9 @@
 ﻿namespace boBBob
 
+open System
 open System.Diagnostics
+open System.Net
+open System.Xml.Xsl
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
 
@@ -67,6 +70,11 @@ module State =
     let placeTiles : (coord * (uint32 * (char * int))) list -> state -> state = fun newTiles st ->
         {st with tiles = List.fold (fun acc (cd, (_, (ch, _))) -> Map.add cd ch acc) st.tiles newTiles}
 module internal ScrabblePlays =
+    type Direction =
+        | UP
+        | DOWN
+        | RIGHT
+        | LEFT
     let idToChar : uint32 -> Map<uint32, tile> -> char = fun id pieces ->
         Map.find id pieces
         |> (fun s -> Set.minElement s)
@@ -96,6 +104,73 @@ module internal ScrabblePlays =
     
     let placeFirstMove : uint32 list -> Map<uint32, tile> -> (coord * (uint32 * (char * int))) list = fun chars pieces ->
         List.mapi (fun i ch -> ((-i, 0), (ch, (idToChar ch pieces, idToPoints ch pieces)))) chars
+    
+    let coordPlusDir : coord -> Direction -> coord = fun cd dir ->
+        match dir with
+        | Direction.UP ->    cd |> (fun (x, y) -> (x,  y-1))
+        | Direction.DOWN ->  cd |> (fun (x, y) -> (x,  y+1))
+        | Direction.LEFT ->  cd |> (fun (x, y) -> (x-1, y ))
+        | Direction.RIGHT -> cd |> (fun (x, y) -> (x+1, y ))
+    let oppositeDir : Direction -> Direction = fun dir ->
+        match dir with
+        | Direction.UP -> Direction.DOWN
+        | Direction.LEFT -> Direction.RIGHT
+        | Direction.DOWN -> Direction.UP
+        | Direction.RIGHT -> Direction.LEFT
+    
+    let findMove : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> coord -> Map<coord, char> -> ((coord * (uint32 * (char * int ))) list) list =
+            fun hand pieces dict originalCoordinate tiles ->
+        let rec aux : MultiSet.MultiSet<uint32> -> Dictionary.Dict -> coord -> Direction -> Boolean -> ((coord * (uint32 * (char * int ))) list) option =
+            fun hand dict cd dir hasPlaced ->
+            if Map.containsKey (coordPlusDir cd dir) tiles
+            then None // Handle check for other words
+            else
+                match Dictionary.reverse dict with
+                | Some (b, dict') ->
+                    if b && hasPlaced
+                    then Some []
+                    else
+                        match aux hand dict' originalCoordinate (oppositeDir dir) hasPlaced with
+                        | Some xs -> Some xs
+                        | None ->
+                            MultiSet.fold (fun acc ch _ ->
+                                match acc with
+                                | Some x -> Some x
+                                | None ->
+                                    match Dictionary.step (idToChar ch pieces) dict' with
+                                    | Some (b, dict'') ->
+                                        if b
+                                        then Some [coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))]
+                                        else
+                                            match aux (MultiSet.removeSingle ch hand) dict'' (coordPlusDir cd dir) dir true with
+                                            | Some xs -> Some ((coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))) :: xs)
+                                            | None -> acc
+                                    | None -> acc
+                            ) None hand
+                | None ->
+                    MultiSet.fold (fun acc ch _ ->
+                        match acc with
+                        | Some x -> Some x
+                        | None ->
+                            match Dictionary.step (idToChar ch pieces) dict with
+                            | Some (b, dict') ->
+                                if b
+                                then Some [coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))]
+                                else
+                                    match aux (MultiSet.removeSingle ch hand) dict' (coordPlusDir cd dir) dir true with
+                                    | Some xs -> Some ((coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))) :: xs)
+                                    | None -> acc
+                            | None -> acc
+                        ) None hand
+                    
+                                
+        debugPrint "Find move\n"
+        [aux hand dict originalCoordinate Direction.LEFT false; aux hand dict originalCoordinate Direction.UP false;]
+        |> List.fold (fun acc word ->
+            match word with
+            | Some w -> w :: acc
+            | None -> acc
+            ) []
 module Scrabble =
     open System.Threading
     open ScrabblePlays
@@ -106,29 +181,36 @@ module Scrabble =
             Print.printHand pieces (State.hand st)
 
             // remove the force print when you move on from manual input (or when you have learnt the format)
-            forcePrint "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
-            debugPrint (sprintf "Tiles placed on board: %A\n" (State.tiles st))
-            let input =  System.Console.ReadLine()
-            let move = RegEx.parseMove input
+            // forcePrint "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
+            // let input =  System.Console.ReadLine()
+            // let move = RegEx.parseMove input
 
-            debugPrint "boBBob play\n"
             // Search for move
             if Map.containsKey st.board.center st.tiles
-            then send cstream (SMPlay move)// Play move
+            then
+                debugPrint "Find not first move\n"
+                Map.fold (fun acc cd _ ->
+                    findMove (State.hand st) pieces (State.dict st) cd (State.tiles st) @ acc
+                    ) [] (State.tiles st)
+                |> (fun ls ->
+                    debugPrint (sprintf "Moves found:\n%A\n" ls)
+                    if List.length ls = 0
+                    then SMPass
+                    else SMPlay ls[0])
+                |> send cstream
             else
-                debugPrint "boBBob tries to play first move\n" |> ignore;
+                debugPrint "Find first move\n"
                 findFirstWord (State.hand st) pieces (State.dict st)
                 |> (fun word ->
                     match word with
-                    | Some upword -> placeFirstMove upword pieces |> SMPlay 
+                    | Some chars -> placeFirstMove chars pieces |> SMPlay 
                     | None -> debugPrint "boBBob couldn't find a word\n" |> ignore; SMPass)
                 |> send cstream
 
-            debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
-            
+            // debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
 
             let msg = recv cstream
-            debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
+            // debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
 
             match msg with
             | RCM (CMPlaySuccess(ms, points, newPieces)) ->
