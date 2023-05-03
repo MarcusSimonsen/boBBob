@@ -1,5 +1,6 @@
 ﻿namespace boBBob
 
+open System.Diagnostics
 open ScrabbleUtil
 open ScrabbleUtil.ServerCommunication
 
@@ -46,14 +47,16 @@ module State =
         dict          : ScrabbleUtil.Dictionary.Dict
         playerNumber  : uint32
         hand          : MultiSet.MultiSet<uint32>
+        tiles         : Map<coord, char>
     }
 
-    let mkState b d pn h = {board = b; dict = d;  playerNumber = pn; hand = h }
+    let mkState b d pn h = {board = b; dict = d;  playerNumber = pn; hand = h; tiles = Map.empty }
 
     let board st         = st.board
     let dict st          = st.dict
     let playerNumber st  = st.playerNumber
     let hand st          = st.hand
+    let tiles st         = st.tiles
 
     let removeTiles : (coord * (uint32 * (char * int))) list -> state -> state = fun tilesToRemove st ->
         {st with hand = List.fold (fun acc (_, (cid, _)) -> MultiSet.removeSingle cid acc) st.hand tilesToRemove}
@@ -61,11 +64,41 @@ module State =
     let addTiles : (uint32 * uint32) list -> state -> state = fun newTiles st ->
         {st with hand = List.fold (fun acc (cid, amount) -> MultiSet.add cid amount acc) st.hand newTiles}
 
-    // let addToBoard : (coord * (uint32 * (char * int))) list -> state -> state = fun tiles st ->
-    //     {st with board = }
-
+    let placeTiles : (coord * (uint32 * (char * int))) list -> state -> state = fun newTiles st ->
+        {st with tiles = List.fold (fun acc (cd, (_, (ch, _))) -> Map.add cd ch acc) st.tiles newTiles}
+module internal ScrabblePlays =
+    let idToChar : uint32 -> Map<uint32, tile> -> char = fun id pieces ->
+        Map.find id pieces
+        |> (fun s -> Set.minElement s)
+        |> fst
+    let idToPoints : uint32 -> Map<uint32, tile> -> int = fun id pieces ->
+        Map.find id pieces
+        |> (fun s -> Set.minElement s)
+        |> snd
+    let completesWord : Dictionary.Dict -> bool = fun dict ->
+        match Dictionary.reverse dict with
+            | Some (b, _) -> b
+            | None -> false
+    let rec findFirstWord : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> (uint32 list) option = fun hand pieces dict ->
+        if completesWord dict
+        then Some []
+        else MultiSet.fold (fun acc c _ ->
+            match acc with
+            | Some x -> Some x
+            | None ->
+                match Dictionary.step (idToChar c pieces) dict with
+                    | Some (_, dict') ->
+                        match findFirstWord (MultiSet.removeSingle c hand) pieces dict' with
+                        | Some xs -> Some (c :: xs)
+                        | None -> None
+                    | None -> None
+                    ) None hand
+    
+    let placeFirstMove : uint32 list -> Map<uint32, tile> -> (coord * (uint32 * (char * int))) list = fun chars pieces ->
+        List.mapi (fun i ch -> ((-i, 0), (ch, (idToChar ch pieces, idToPoints ch pieces)))) chars
 module Scrabble =
     open System.Threading
+    open ScrabblePlays
 
     let playGame cstream pieces (st : State.state) =
 
@@ -74,16 +107,25 @@ module Scrabble =
 
             // remove the force print when you move on from manual input (or when you have learnt the format)
             forcePrint "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
-            forcePrint (sprintf "Default square used: %A\n\n" st.board.defaultSquare)
+            debugPrint (sprintf "Tiles placed on board: %A\n" (State.tiles st))
             let input =  System.Console.ReadLine()
             let move = RegEx.parseMove input
 
+            debugPrint "boBBob play\n"
             // Search for move
-            // Write a function that given a set of pieces (hand + squares on board), a board, a coordinate on the board, a dictionary
-            // (and a direction?) calculates a valid word to place on the board
-            
+            if Map.containsKey st.board.center st.tiles
+            then send cstream (SMPlay move)// Play move
+            else
+                debugPrint "boBBob tries to play first move\n" |> ignore;
+                findFirstWord (State.hand st) pieces (State.dict st)
+                |> (fun word ->
+                    match word with
+                    | Some upword -> placeFirstMove upword pieces |> SMPlay 
+                    | None -> debugPrint "boBBob couldn't find a word\n" |> ignore; SMPass)
+                |> send cstream
+
             debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
-            send cstream (SMPlay move)
+            
 
             let msg = recv cstream
             debugPrint (sprintf "Player %d <- Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
@@ -94,9 +136,8 @@ module Scrabble =
                 let st' =
                     st
                     |> State.removeTiles ms     // Remove used tiles from hand
-                    |> State.addTiles newPieces         // Add new tiles to hand
-                // Update board
-                // ...
+                    |> State.addTiles newPieces // Add new tiles to hand
+                    |> State.placeTiles ms               // Update board
                 aux st'
             | RCM (CMPlayed (pid, ms, points)) ->
                 (* Successful play by other player. Update your state *)
