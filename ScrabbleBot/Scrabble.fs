@@ -79,7 +79,9 @@ module Scrabble =
             let move = RegEx.parseMove input
 
             // Search for move
-
+            // Write a function that given a set of pieces (hand + squares on board), a board, a coordinate on the board, a dictionary
+            // (and a direction?) calculates a valid word to place on the board
+            
             debugPrint (sprintf "Player %d -> Server:\n%A\n" (State.playerNumber st) move) // keep the debug lines. They are useful.
             send cstream (SMPlay move)
 
@@ -92,17 +94,30 @@ module Scrabble =
                 let st' =
                     st
                     |> State.removeTiles ms     // Remove used tiles from hand
-                    |> State.addTiles newPieces // Add new tiles to hand
+                    |> State.addTiles newPieces         // Add new tiles to hand
                 // Update board
                 // ...
                 aux st'
             | RCM (CMPlayed (pid, ms, points)) ->
                 (* Successful play by other player. Update your state *)
                 let st' = st // This state needs to be updated
+                // Update board
                 aux st'
             | RCM (CMPlayFailed (pid, ms)) ->
-                (* Failed play. Update your state *)
+                (* Failed play by given player. Update your state (multiplayer - who's turn is it) *)
                 let st' = st // This state needs to be updated
+                aux st'
+            | RCM (CMChangeSuccess newPieces) ->
+                (* You succesfully changed pieces. Update your state *)
+                let st' = st |> State.addTiles newPieces // Add new tiles to hand
+                aux st'
+            | RCM (CMPassed pid) ->
+                (* Given player passed. Update your state (three passes in a row from all players end the game) *)
+                let st' = st
+                aux st'
+            | RCM (CMForfeit pid) ->
+                (* Given player forfeited. Update your state (in multiplayer keep track of who is still in the game) *)
+                let st' = st
                 aux st'
             | RCM (CMGameOver _) -> ()
             | RCM a -> failwith (sprintf "not implmented: %A" a)
