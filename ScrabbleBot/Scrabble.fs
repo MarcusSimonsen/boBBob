@@ -162,10 +162,12 @@ module internal ScrabblePlays =
                                     | None -> acc
                             | None -> acc
                         ) None hand
-                    
-                                
-        debugPrint "Find move\n"
-        [aux hand dict originalCoordinate Direction.LEFT false; aux hand dict originalCoordinate Direction.UP false;]
+
+
+        match Dictionary.step tiles[originalCoordinate] dict with
+        | Some (_, dict') -> 
+            [aux hand dict' originalCoordinate Direction.LEFT false; aux hand dict' originalCoordinate Direction.UP false;]
+        | None -> []
         |> List.fold (fun acc word ->
             match word with
             | Some w -> w :: acc
