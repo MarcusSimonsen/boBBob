@@ -123,7 +123,11 @@ module internal ScrabblePlays =
         let rec aux : MultiSet.MultiSet<uint32> -> Dictionary.Dict -> coord -> Direction -> Boolean -> ((coord * (uint32 * (char * int ))) list) option =
             fun hand dict cd dir hasPlaced ->
             if Map.containsKey (coordPlusDir cd dir) tiles
-            then None // Handle check for expanding words
+                // Handle check for expanding words
+            then
+                match Dictionary.step tiles[coordPlusDir cd dir] dict with
+                | Some (_, dict') -> aux hand dict' (coordPlusDir cd dir) dir hasPlaced
+                | None -> None
             else
                 match Dictionary.reverse dict with
                 | Some (b, dict') ->
