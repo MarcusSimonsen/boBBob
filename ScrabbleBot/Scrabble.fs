@@ -118,12 +118,12 @@ module internal ScrabblePlays =
         | Direction.DOWN -> Direction.UP
         | Direction.RIGHT -> Direction.LEFT
     
-    let findMove : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> coord -> Map<coord, char> -> ((coord * (uint32 * (char * int ))) list) list =
-            fun hand pieces dict originalCoordinate tiles ->
+    let findMoves : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> coord -> Map<coord, char> -> ((coord * (uint32 * (char * int ))) list) list =
+            fun hand pieces orgDict originalCoordinate tiles ->
         let rec aux : MultiSet.MultiSet<uint32> -> Dictionary.Dict -> coord -> Direction -> Boolean -> ((coord * (uint32 * (char * int ))) list) option =
             fun hand dict cd dir hasPlaced ->
             if Map.containsKey (coordPlusDir cd dir) tiles
-            then None // Handle check for other words
+            then None // Handle check for expanding words
             else
                 match Dictionary.reverse dict with
                 | Some (b, dict') ->
@@ -164,7 +164,7 @@ module internal ScrabblePlays =
                         ) None hand
 
 
-        match Dictionary.step tiles[originalCoordinate] dict with
+        match Dictionary.step tiles[originalCoordinate] orgDict with
         | Some (_, dict') -> 
             [aux hand dict' originalCoordinate Direction.LEFT false; aux hand dict' originalCoordinate Direction.UP false;]
         | None -> []
@@ -190,18 +190,15 @@ module Scrabble =
             // Search for move
             if Map.containsKey st.board.center st.tiles
             then
-                debugPrint "Find not first move\n"
                 Map.fold (fun acc cd _ ->
-                    findMove (State.hand st) pieces (State.dict st) cd (State.tiles st) @ acc
+                    findMoves (State.hand st) pieces (State.dict st) cd (State.tiles st) @ acc
                     ) [] (State.tiles st)
                 |> (fun ls ->
-                    debugPrint (sprintf "Moves found:\n%A\n" ls)
                     if List.length ls = 0
                     then SMPass
                     else SMPlay ls[0])
                 |> send cstream
             else
-                debugPrint "Find first move\n"
                 findFirstWord (State.hand st) pieces (State.dict st)
                 |> (fun word ->
                     match word with
@@ -233,7 +230,7 @@ module Scrabble =
                 let st' = st // This state needs to be updated
                 aux st'
             | RCM (CMChangeSuccess newPieces) ->
-                (* You succesfully changed pieces. Update your state *)
+                (* You successfully changed pieces. Update your state *)
                 let st' = st |> State.addTiles newPieces // Add new tiles to hand
                 aux st'
             | RCM (CMPassed pid) ->
