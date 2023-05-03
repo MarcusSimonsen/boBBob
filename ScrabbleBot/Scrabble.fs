@@ -138,11 +138,11 @@ module internal ScrabblePlays =
                                 | Some x -> Some x
                                 | None ->
                                     match Dictionary.step (idToChar ch pieces) dict' with
-                                    | Some (b, dict'') ->
+                                    | Some (b, dict') ->
                                         if b
                                         then Some [coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))]
                                         else
-                                            match aux (MultiSet.removeSingle ch hand) dict'' (coordPlusDir cd dir) dir true with
+                                            match aux (MultiSet.removeSingle ch hand) dict' (coordPlusDir cd dir) dir true with
                                             | Some xs -> Some ((coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))) :: xs)
                                             | None -> acc
                                     | None -> acc
