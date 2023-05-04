@@ -69,24 +69,34 @@ module State =
 
     let placeTiles : (coord * (uint32 * (char * int))) list -> state -> state = fun newTiles st ->
         {st with tiles = List.fold (fun acc (cd, (_, (ch, _))) -> Map.add cd ch acc) st.tiles newTiles}
+        
 module internal ScrabblePlays =
     type Direction =
         | UP
         | DOWN
         | RIGHT
         | LEFT
+    
+    // Returns char for given tile's id
+    // if wild card, returns the letter A 
     let idToChar : uint32 -> Map<uint32, tile> -> char = fun id pieces ->
         Map.find id pieces
         |> (fun s -> Set.minElement s)
         |> fst
+    
+    // Returns point value for given tile's id
     let idToPoints : uint32 -> Map<uint32, tile> -> int = fun id pieces ->
         Map.find id pieces
         |> (fun s -> Set.minElement s)
         |> snd
+        
     let completesWord : Dictionary.Dict -> bool = fun dict ->
         match Dictionary.reverse dict with
             | Some (b, _) -> b
             | None -> false
+    
+    // Used to find the first move of the game
+    // Right now returns the first valid word it finds
     let rec findFirstWord : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> (uint32 list) option = fun hand pieces dict ->
         if completesWord dict
         then Some []
@@ -102,15 +112,18 @@ module internal ScrabblePlays =
                     | None -> None
                     ) None hand
     
+    // Places first move on board
     let placeFirstMove : uint32 list -> Map<uint32, tile> -> (coord * (uint32 * (char * int))) list = fun chars pieces ->
         List.mapi (fun i ch -> ((-i, 0), (ch, (idToChar ch pieces, idToPoints ch pieces)))) chars
     
+    // Moves coord one place in the given direction
     let coordPlusDir : coord -> Direction -> coord = fun cd dir ->
         match dir with
         | Direction.UP ->    cd |> (fun (x, y) -> (x,  y-1))
         | Direction.DOWN ->  cd |> (fun (x, y) -> (x,  y+1))
         | Direction.LEFT ->  cd |> (fun (x, y) -> (x-1, y ))
         | Direction.RIGHT -> cd |> (fun (x, y) -> (x+1, y ))
+        
     let oppositeDir : Direction -> Direction = fun dir ->
         match dir with
         | Direction.UP -> Direction.DOWN
@@ -118,61 +131,62 @@ module internal ScrabblePlays =
         | Direction.DOWN -> Direction.UP
         | Direction.RIGHT -> Direction.LEFT
     
+    // Used to find a valid move (except the first move of the game)
+    // Right now returns the first valid word it finds
     let findMoves : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> coord -> Map<coord, char> -> ((coord * (uint32 * (char * int ))) list) list =
             fun hand pieces orgDict originalCoordinate tiles ->
         let rec aux : MultiSet.MultiSet<uint32> -> Dictionary.Dict -> coord -> Direction -> Boolean -> ((coord * (uint32 * (char * int ))) list) option =
             fun hand dict cd dir hasPlaced ->
-            if Map.containsKey (coordPlusDir cd dir) tiles
-                // Handle check for expanding words
-            then
+            if Map.containsKey (coordPlusDir cd dir) tiles 
+            then  // Tile is already placed on this coordinate - Handle check for expanding words
                 match Dictionary.step tiles[coordPlusDir cd dir] dict with
                 | Some (_, dict') -> aux hand dict' (coordPlusDir cd dir) dir hasPlaced
                 | None -> None
-            else
+            else  // Empty tile
                 match Dictionary.reverse dict with
-                | Some (b, dict') ->
-                    if b && hasPlaced
+                | Some (b, dict') ->  // Reached end of word
+                    if b && hasPlaced // Valid word is found using at least one tile from the hand -> return 
                     then Some []
-                    else
+                    else 
                         match aux hand dict' originalCoordinate (oppositeDir dir) hasPlaced with
                         | Some xs -> Some xs
                         | None ->
-                            MultiSet.fold (fun acc ch _ ->
+                            MultiSet.fold (fun acc ch _ -> // Fold through tiles on hand, checking if they can be used to form a valid word
                                 match acc with
                                 | Some x -> Some x
                                 | None ->
-                                    match Dictionary.step (idToChar ch pieces) dict' with
+                                    match Dictionary.step (idToChar ch pieces) dict' with 
                                     | Some (b, dict') ->
                                         if b
-                                        then Some [coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))]
+                                        then Some [coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))] // Valid word is found
                                         else
-                                            match aux (MultiSet.removeSingle ch hand) dict' (coordPlusDir cd dir) dir true with
+                                            match aux (MultiSet.removeSingle ch hand) dict' (coordPlusDir cd dir) dir true with // Remove used tile from hand and continue looking for next letter to form valid word?
                                             | Some xs -> Some ((coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))) :: xs)
                                             | None -> acc
                                     | None -> acc
                             ) None hand
-                | None ->
-                    MultiSet.fold (fun acc ch _ ->
+                | None -> // Not reached end of word
+                    MultiSet.fold (fun acc ch _ -> // Fold through tiles on hand, checking if they can be used to form a valid word
                         match acc with
                         | Some x -> Some x
                         | None ->
-                            match Dictionary.step (idToChar ch pieces) dict with
+                            match Dictionary.step (idToChar ch pieces) dict with 
                             | Some (b, dict') ->
                                 if b
-                                then Some [coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))]
+                                then Some [coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))] // Valid word is found
                                 else
-                                    match aux (MultiSet.removeSingle ch hand) dict' (coordPlusDir cd dir) dir true with
+                                    match aux (MultiSet.removeSingle ch hand) dict' (coordPlusDir cd dir) dir true with // Remove used tile from hand and continue looking for next letter to form valid word?
                                     | Some xs -> Some ((coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))) :: xs)
                                     | None -> acc
                             | None -> acc
                         ) None hand
 
 
-        match Dictionary.step tiles[originalCoordinate] orgDict with
+        match Dictionary.step tiles[originalCoordinate] orgDict with // Finds starting tile in dict
         | Some (_, dict') -> 
-            [aux hand dict' originalCoordinate Direction.LEFT false; aux hand dict' originalCoordinate Direction.UP false;]
+            [aux hand dict' originalCoordinate Direction.LEFT false; aux hand dict' originalCoordinate Direction.UP false;] // Tries to find one valid word in direction left and one valid word in direction up
         | None -> []
-        |> List.fold (fun acc word ->
+        |> List.fold (fun acc word -> // Appends found words to a list?
             match word with
             | Some w -> w :: acc
             | None -> acc
