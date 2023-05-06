@@ -241,7 +241,6 @@ module Scrabble =
 
             // If it is my turn 
             if (st.playerNumber = st.playerTurn) then
-                //Print.printPlayer st.playerTurn
                 Print.printHand pieces (State.hand st) (State.playerNumber st)
                 // Search for move
                 if Map.containsKey st.board.center st.tiles
@@ -331,7 +330,7 @@ module Scrabble =
                 | GPENotEnoughPieces _  -> let st' =                       // Not enough tiles left to change. Counts as pass instead
                                                st
                                                |> State.changeCanChange    // Make it not possible to change tiles anymore
-                                               |> State.changePlayerTurn             // Change turn
+                                               |> State.changePlayerTurn            // Change turn
                                            aux st'
                 | _                     -> let st' =                       // Errors counts as passing so the players dont get stuck
                                                st
