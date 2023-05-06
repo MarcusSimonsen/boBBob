@@ -1,15 +1,17 @@
 # boBBob
 FSharp bot for playing Scrabble
 
-## How to run 
+### Running the program
 From the bobBob directory run: 
 ```dotnet run --project ./ScrabbleTemplate/```
 
 It may take some time before the game begins, as the GADDAG needs to be built
 
 ### Achieved
-- Finish a game
-- Multiplayer and dictionary 
+- Finish a game on infinite board
+- Multi-player and dictionary
+  - To play multiplayer, comment in line 58 in Program.fs and comment out line 57 
 ### Not achieved
-- Play on all boards
-- Asyncronous
+- Playing on all boards
+- Parallelism
+- Respect the timeout flag
