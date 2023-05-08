@@ -2,7 +2,7 @@
 FSharp bot for playing Scrabble
 
 ### Running the program
-From the bobBob directory run: 
+From the "ScrabbleProject" directory run: 
 
 ```bash
 dotnet run --project ScrabbleTemplate
