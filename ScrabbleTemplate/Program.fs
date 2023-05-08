@@ -19,7 +19,7 @@ let spawnMultiples name dict bot =
 
 [<EntryPoint>]
 let main argv =
-    ScrabbleUtil.DebugPrint.toggleDebugPrint true // Change to false to supress debug output
+    ScrabbleUtil.DebugPrint.toggleDebugPrint false // Change to false to supress debug output
 
     System.Console.BackgroundColor <- System.ConsoleColor.White
     System.Console.ForegroundColor <- System.ConsoleColor.Black
@@ -56,7 +56,7 @@ let main argv =
 
     // let players    = [("boBBob", dictionary, boBBob.Scrabble.startGame)]              // SINGLE PLAYER
     // let players    = [("boBBob", dictionary, boBBob.Scrabble.startGame); ("Oxyphenbutazone", dictionary, Oxyphenbutazone.Scrabble.startGame)]              // MULTIPLAYER vs Oxyphenbutazone
-    let players = spawnMultiples "boBBob" dictionary boBBob.Scrabble.startGame 4    // MULTIPLAYER
+    let players = spawnMultiples "boBBob" dictionary boBBob.Scrabble.startGame 2    // MULTIPLAYER
 
     // Uncomment to test your dictionary
     // let incorrectWords = ScrabbleUtil.Dictionary.test words 10 (dictionary false) // change the boolean to true if using a GADDAG

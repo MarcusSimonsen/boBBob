@@ -129,7 +129,7 @@ module internal ScrabblePlays =
             | None -> false
     
     // Used to find the first move of the game
-    // Returns word with the highest score
+    // Returns word with the highest score 
     let rec findFirstWord : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> int -> uint32 list -> int -> uint32 list -> (int * uint32 list) =
         fun hand pieces dict currentScore currentWord bestScore bestWord ->
         MultiSet.fold (fun (bscore, bword) c _ ->
@@ -202,51 +202,49 @@ module internal ScrabblePlays =
                 | Some (_, dict') -> checkDirectionBack tiles dict' (coordPlusDir coordinate (perpendicularDir dir)) coordinate (perpendicularDir dir)
                 | None -> false // Should never happen
             else true
+            
+    let maxMove : int * (coord * (uint32 * (char * int ))) list -> int * (coord * (uint32 * (char * int ))) list -> int * (coord * (uint32 * (char * int ))) list =
+        fun (score1, word1) (score2, word2) ->
+            if score1 > score2
+            then score1, word1
+            else score2, word2
     
     // Used to find a valid move (except the first move of the game)
     // Right now returns the first valid word it finds
-    let findMoves : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> coord -> Map<coord, char> -> ((coord * (uint32 * (char * int ))) list) list =
-            fun hand pieces orgDict originalCoordinate tiles ->
-        let rec aux : MultiSet.MultiSet<uint32> -> Dictionary.Dict -> coord -> Direction -> Boolean -> ((coord * (uint32 * (char * int ))) list) option =
-            fun hand dict cd dir hasPlaced ->
+    let findMoves : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> coord -> Map<coord, char> -> int -> (coord * (uint32 * (char * int ))) list -> int * (coord * (uint32 * (char * int ))) list =
+            fun hand pieces orgDict originalCoordinate tiles bestScore bestMove ->
+        let rec aux : MultiSet.MultiSet<uint32> -> Dictionary.Dict -> coord -> Direction -> Boolean -> int -> (coord * (uint32 * (char * int ))) list -> int -> (coord * (uint32 * (char * int ))) list -> int * (coord * (uint32 * (char * int ))) list =
+            fun hand dict cd dir hasPlaced currentScore currentWord bestScore bestWord ->
             if Map.containsKey (coordPlusDir cd dir) tiles 
             then  // Tile is already placed on this coordinate - Handle check for expanding words
                 match Dictionary.step tiles[coordPlusDir cd dir] dict with
-                | Some (_, dict') -> aux hand dict' (coordPlusDir cd dir) dir hasPlaced
-                | None -> None
+                | Some (_, dict') -> aux hand dict' (coordPlusDir cd dir) dir hasPlaced currentScore currentWord bestScore bestWord
+                | None -> bestScore, bestWord
             else  // Empty tile
-                match Dictionary.reverse dict with
-                | Some (b, dict') ->  // Reached end of word
-                    if b && hasPlaced && checkDirectionForward tiles dict' (coordPlusDir cd dir) dir // Valid word is found using at least one tile from the hand -> return 
-                    then Some []
-                    else aux hand dict' originalCoordinate (oppositeDir dir) hasPlaced
-                | None -> // Not reached end of word
-                    MultiSet.fold (fun acc ch _ -> // Fold through tiles on hand, checking if they can be used to form a valid word
-                        match acc with
-                        | Some x -> Some x
-                        | None ->
+                maxMove
+                    (match Dictionary.reverse dict with
+                    | Some (b, dict') ->  // Reached end of word
+                        if b && hasPlaced && checkDirectionForward tiles dict' (coordPlusDir cd dir) dir && not (Map.containsKey (coordPlusDir (coordPlusDir cd dir) dir) tiles) // Valid word is found using at least one tile from the hand -> return 
+                        then maxMove (currentScore, currentWord) (bestScore, bestWord)
+                        else aux hand dict' originalCoordinate (oppositeDir dir) hasPlaced currentScore currentWord bestScore bestWord
+                    | None -> (bestScore, bestWord)) // Not reached end of word
+                    (MultiSet.fold (fun (bscore, bword) ch _ -> // Fold through tiles on hand, checking if they can be used to form a valid word
                             match Dictionary.step (idToChar ch pieces) dict with
                             | Some (b, dict') ->
-                                if b && checkDirections tiles orgDict (idToChar ch pieces) (coordPlusDir cd dir) dir
-                                then Some [coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))] // Place a new tile
+                                if b && checkDirections tiles orgDict (idToChar ch pieces) (coordPlusDir cd dir) dir && not (Map.containsKey (coordPlusDir (coordPlusDir cd dir) dir) tiles)
+                                then maxMove ((currentScore + (idToPoints ch pieces)), ((coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))) :: currentWord)) (bscore, bword) // Place a new tile
                                 else
-                                    match aux (MultiSet.removeSingle ch hand) dict' (coordPlusDir cd dir) dir true with // Place a new tile
-                                    | Some xs when checkDirections tiles orgDict (idToChar ch pieces) (coordPlusDir cd dir) dir -> Some ((coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))) :: xs)
-                                    | Some _ -> None
-                                    | None -> acc
-                            | None -> acc
-                        ) None hand
+                                    if checkDirections tiles orgDict (idToChar ch pieces) (coordPlusDir cd dir) dir
+                                    then aux (MultiSet.removeSingle ch hand) dict' (coordPlusDir cd dir) dir true (currentScore + (idToPoints ch pieces)) ((coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))) :: currentWord) bscore bword // Place a new tile
+                                    else bscore, bword
+                            | None -> bscore, bword
+                        ) (bestScore, bestWord) hand)
 
 
         match Dictionary.step tiles[originalCoordinate] orgDict with // Finds starting tile in dict
         | Some (_, dict') -> 
-            [aux hand dict' originalCoordinate Direction.LEFT false; aux hand dict' originalCoordinate Direction.UP false;] // Tries to find one valid word in direction left and one valid word in direction up
-        | None -> []
-        |> List.fold (fun acc word -> // Removes occurences of "None" in list
-            match word with
-            | Some w -> w :: acc
-            | None -> acc
-            ) []
+            maxMove (aux hand dict' originalCoordinate Direction.LEFT false 0 [] bestScore bestMove) (aux hand dict' originalCoordinate Direction.UP false 0 [] bestScore bestMove) // Tries to find one valid word in direction left and one valid word in direction up
+        | None -> 0, []
        
 module Scrabble =
     open System.Threading
@@ -259,7 +257,7 @@ module Scrabble =
             
             // remove the force print when you move on from manual input (or when you have learnt the format)
             // forcePrint "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
-            let input =  System.Console.ReadLine()
+            // let input =  System.Console.ReadLine()
             // let move = RegEx.parseMove input
 
             // If it is my turn 
@@ -268,13 +266,12 @@ module Scrabble =
                 // Search for move
                 if Map.containsKey st.board.center st.tiles
                 then
-                    Map.fold (fun acc cd _ ->
-                        findMoves (State.hand st) pieces (State.dict st) cd (State.tiles st) @ acc
-                        ) [] (State.tiles st)
-                    |> (fun ls ->
-                        if List.length ls = 0 // If no moves are found
+                    Map.fold (fun (bestScore, bestMove) cd _ ->
+                        maxMove (bestScore, bestMove) (findMoves (State.hand st) pieces (State.dict st) cd (State.tiles st) bestScore bestMove)) (0, []) (State.tiles st)
+                    |> (fun (score, move) ->
+                        if score = 0 // If no moves are found
                         then st |> State.changeOrPass
-                        else SMPlay ls[0]) 
+                        else SMPlay move) 
                     |> send cstream
                 else // If it is the first move
                     sprintf "%A\n" (findFirstWord (State.hand st) pieces (State.dict st) 0 [] 0 []) |> debugPrint
