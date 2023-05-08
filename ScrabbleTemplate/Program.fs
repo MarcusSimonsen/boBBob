@@ -54,7 +54,8 @@ let main argv =
     let (dictionary, time) =
         time (fun () -> ScrabbleUtil.Dictionary.mkDict words dictAPI)
 
-    //let players    = [("boBBob", dictionary, boBBob.Scrabble.startGame)]              // SINGLE PLAYER
+    // let players    = [("boBBob", dictionary, boBBob.Scrabble.startGame)]              // SINGLE PLAYER
+    // let players    = [("boBBob", dictionary, boBBob.Scrabble.startGame); ("Oxyphenbutazone", dictionary, Oxyphenbutazone.Scrabble.startGame)]              // MULTIPLAYER vs Oxyphenbutazone
     let players = spawnMultiples "boBBob" dictionary boBBob.Scrabble.startGame 4    // MULTIPLAYER
 
     // Uncomment to test your dictionary

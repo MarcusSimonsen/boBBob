@@ -129,25 +129,25 @@ module internal ScrabblePlays =
             | None -> false
     
     // Used to find the first move of the game
-    // Right now returns the first valid word it finds
-    let rec findFirstWord : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> (uint32 list) option = fun hand pieces dict ->
-        if completesWord dict
-        then Some []
-        else MultiSet.fold (fun acc c _ ->
-            match acc with
-            | Some x -> Some x
-            | None ->
-                match Dictionary.step (idToChar c pieces) dict with
-                    | Some (_, dict') ->
-                        match findFirstWord (MultiSet.removeSingle c hand) pieces dict' with
-                        | Some xs -> Some (c :: xs)
-                        | None -> None
-                    | None -> None
-                    ) None hand
+    // Returns word with the highest score
+    let rec findFirstWord : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> int -> uint32 list -> int -> uint32 list -> (int * uint32 list) =
+        fun hand pieces dict currentScore currentWord bestScore bestWord ->
+        MultiSet.fold (fun (bscore, bword) c _ ->
+            match Dictionary.step (idToChar c pieces) dict with
+            | Some (_, dict') ->
+                if completesWord dict' // End of a word
+                then
+                    if currentScore + (idToPoints c pieces) > bscore
+                    then findFirstWord (MultiSet.removeSingle c hand) pieces dict' (currentScore + (idToPoints c pieces)) (c :: currentWord) (currentScore + (idToPoints c pieces)) (c :: currentWord)  // Update bestScore and bestWord 
+                    else findFirstWord (MultiSet.removeSingle c hand) pieces dict' (currentScore + (idToPoints c pieces)) (c :: currentWord) bscore bword
+                else 
+                    findFirstWord (MultiSet.removeSingle c hand) pieces dict' (currentScore + (idToPoints c pieces)) (c :: currentWord) bscore bword
+            | None -> (bscore, bword)
+        ) (bestScore, bestWord) hand
     
     // Places first move on board
     let placeFirstMove : uint32 list -> Map<uint32, tile> -> (coord * (uint32 * (char * int))) list = fun chars pieces ->
-        List.mapi (fun i ch -> ((-i, 0), (ch, (idToChar ch pieces, idToPoints ch pieces)))) chars
+        List.mapi (fun i ch -> ((i, 0), (ch, (idToChar ch pieces, idToPoints ch pieces)))) chars
     
     // Moves coord one place in the given direction
     let coordPlusDir : coord -> Direction -> coord = fun cd dir ->
@@ -255,7 +255,7 @@ module Scrabble =
     let playGame cstream pieces (st : State.state) =
 
         let rec aux (st : State.state) =
-            Thread.Sleep(1000)  // Wait 1 second to finish prints in multiplayer
+            // Thread.Sleep(1000)  // Wait 1 second to finish prints in multiplayer
             
             // remove the force print when you move on from manual input (or when you have learnt the format)
             // forcePrint "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
@@ -277,11 +277,16 @@ module Scrabble =
                         else SMPlay ls[0]) 
                     |> send cstream
                 else // If it is the first move
-                    findFirstWord (State.hand st) pieces (State.dict st)
-                    |> (fun word ->
+                    sprintf "%A\n" (findFirstWord (State.hand st) pieces (State.dict st) 0 [] 0 []) |> debugPrint
+                    findFirstWord (State.hand st) pieces (State.dict st) 0 [] 0 []
+                    |> (fun (_, word) ->
                         match word with
-                        | Some chars -> placeFirstMove chars pieces |> SMPlay 
-                        | None ->  st |> State.changeOrPass)
+                        | [] -> st |> State.changeOrPass
+                        | word -> 
+                            word
+                            |> placeFirstMove <| pieces
+                            |> SMPlay
+                            )
                     |> send cstream
             // Wait for your turn
             else () 
