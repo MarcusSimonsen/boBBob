@@ -217,7 +217,7 @@ module internal ScrabblePlays =
             else  // Empty tile
                 match Dictionary.reverse dict with
                 | Some (b, dict') ->  // Reached end of word
-                    if b && hasPlaced // Valid word is found using at least one tile from the hand -> return 
+                    if b && hasPlaced && checkDirectionForward tiles dict' (coordPlusDir cd dir) dir // Valid word is found using at least one tile from the hand -> return 
                     then Some []
                     else aux hand dict' originalCoordinate (oppositeDir dir) hasPlaced
                 | None -> // Not reached end of word
@@ -259,7 +259,7 @@ module Scrabble =
             
             // remove the force print when you move on from manual input (or when you have learnt the format)
             // forcePrint "Input move (format '(<x-coordinate> <y-coordinate> <piece id><character><point-value> )*', note the absence of space between the last inputs)\n\n"
-            // let input =  System.Console.ReadLine()
+            let input =  System.Console.ReadLine()
             // let move = RegEx.parseMove input
 
             // If it is my turn 
