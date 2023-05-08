@@ -129,7 +129,7 @@ module internal ScrabblePlays =
             | None -> false
     
     // Used to find the first move of the game
-    // Returns word with the highest score 
+    // Returns the word with the most points (not considering DL, DW etc.)
     let rec findFirstWord : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> int -> uint32 list -> int -> uint32 list -> (int * uint32 list) =
         fun hand pieces dict currentScore currentWord bestScore bestWord ->
         MultiSet.fold (fun (bscore, bword) c _ ->
@@ -169,7 +169,9 @@ module internal ScrabblePlays =
         | Direction.DOWN -> Direction.LEFT
         | Direction.LEFT -> Direction.UP
         | Direction.RIGHT -> Direction.UP
-
+        
+       
+    // Recursively walks through tiles placed on board in the forward direction (right/down)
     let rec checkDirectionForward : Map<coord, char> -> Dictionary.Dict  -> coord -> Direction -> Boolean =
         fun tiles dict currentCoordinate dir ->
             if Map.containsKey currentCoordinate tiles
@@ -182,6 +184,7 @@ module internal ScrabblePlays =
                 | None -> false
             else false
 
+    // Recursively walks through tiles placed on board in the back direction (left/up)
     let rec checkDirectionBack : Map<coord, char> -> Dictionary.Dict -> coord -> coord -> Direction -> Boolean =
         fun tiles dict originalCoordinate currentCoordinate dir ->
             if Map.containsKey currentCoordinate tiles
@@ -194,6 +197,7 @@ module internal ScrabblePlays =
                 | Some (_, dict') -> checkDirectionForward tiles dict' (coordPlusDir originalCoordinate (oppositeDir dir)) (oppositeDir dir)
                 | None -> false
     
+    // Checks if the tile to place will create other words with already placed tiles and if those then are valid words
     let checkDirections : Map<coord, char> -> Dictionary.Dict -> char -> coord -> Direction -> Boolean =
         fun tiles dict c coordinate dir ->
             if Map.containsKey (coordPlusDir coordinate (perpendicularDir dir)) tiles || Map.containsKey (coordPlusDir coordinate (oppositeDir (perpendicularDir dir))) tiles
@@ -203,6 +207,7 @@ module internal ScrabblePlays =
                 | None -> false // Should never happen
             else true
             
+    // Finds the highest scoring word out of two possible moves
     let maxMove : int * (coord * (uint32 * (char * int ))) list -> int * (coord * (uint32 * (char * int ))) list -> int * (coord * (uint32 * (char * int ))) list =
         fun (score1, word1) (score2, word2) ->
             if score1 > score2
@@ -210,7 +215,7 @@ module internal ScrabblePlays =
             else score2, word2
     
     // Used to find a valid move (except the first move of the game)
-    // Right now returns the first valid word it finds
+    // Returns the word with the most points (not considering DL, DW etc.)
     let findMoves : MultiSet.MultiSet<uint32> -> Map<uint32, tile> -> Dictionary.Dict -> coord -> Map<coord, char> -> int -> (coord * (uint32 * (char * int ))) list -> int * (coord * (uint32 * (char * int ))) list =
             fun hand pieces orgDict originalCoordinate tiles bestScore bestMove ->
         let rec aux : MultiSet.MultiSet<uint32> -> Dictionary.Dict -> coord -> Direction -> Boolean -> int -> (coord * (uint32 * (char * int ))) list -> int -> (coord * (uint32 * (char * int ))) list -> int * (coord * (uint32 * (char * int ))) list =
@@ -249,7 +254,6 @@ module internal ScrabblePlays =
 module Scrabble =
     open System.Threading
     open ScrabblePlays
-
     let playGame cstream pieces (st : State.state) =
 
         let rec aux (st : State.state) =

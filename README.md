@@ -5,7 +5,7 @@ FSharp bot for playing Scrabble
 From the bobBob directory run: 
 
 ```bash
-dotnet run --project ./ScrabbleTemplate/
+dotnet run --project ScrabbleTemplate
 ```
 
 It may take some time before the game begins, as the GADDAG needs to be built
