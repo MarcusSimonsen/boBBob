@@ -54,8 +54,8 @@ let main argv =
     let (dictionary, time) =
         time (fun () -> ScrabbleUtil.Dictionary.mkDict words dictAPI)
 
-    let players    = [("boBBob", dictionary, boBBob.Scrabble.startGame)]
-    // let players = spawnMultiples "OxyphenButazone" dictionary Oxyphenbutazone.Scrabble.startGame 2
+    //let players    = [("boBBob", dictionary, boBBob.Scrabble.startGame)]              // SINGLE PLAYER
+    let players = spawnMultiples "boBBob" dictionary boBBob.Scrabble.startGame 4    // MULTIPLAYER
 
     // Uncomment to test your dictionary
     // let incorrectWords = ScrabbleUtil.Dictionary.test words 10 (dictionary false) // change the boolean to true if using a GADDAG
