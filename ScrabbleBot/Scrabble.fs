@@ -130,6 +130,45 @@ module internal ScrabblePlays =
         | Direction.LEFT -> Direction.RIGHT
         | Direction.DOWN -> Direction.UP
         | Direction.RIGHT -> Direction.LEFT
+    let perpendicularDir : Direction -> Direction = fun dir ->
+        match dir with
+        | Direction.UP -> Direction.LEFT
+        | Direction.DOWN -> Direction.LEFT
+        | Direction.LEFT -> Direction.UP
+        | Direction.RIGHT -> Direction.UP
+
+    let rec checkDirectionForward : Map<coord, char> -> Dictionary.Dict  -> coord -> Direction -> Boolean =
+        fun tiles dict currentCoordinate dir ->
+            if Map.containsKey currentCoordinate tiles
+            then
+                match Dictionary.step tiles[currentCoordinate] dict with
+                | Some (b, dict') ->
+                    if Map.containsKey (coordPlusDir currentCoordinate dir) tiles
+                    then checkDirectionForward tiles dict' (coordPlusDir currentCoordinate dir) dir
+                    else b
+                | None -> false
+            else false
+
+    let rec checkDirectionBack : Map<coord, char> -> Dictionary.Dict -> coord -> coord -> Direction -> Boolean =
+        fun tiles dict originalCoordinate currentCoordinate dir ->
+            if Map.containsKey currentCoordinate tiles
+            then
+                match Dictionary.step tiles[currentCoordinate] dict with
+                | Some (_, dict') -> checkDirectionBack tiles dict' originalCoordinate (coordPlusDir currentCoordinate dir) dir
+                | None -> false
+            else
+                match Dictionary.reverse dict with
+                | Some (_, dict') -> checkDirectionForward tiles dict' (coordPlusDir originalCoordinate (oppositeDir dir)) (oppositeDir dir)
+                | None -> false
+    
+    let checkDirections : Map<coord, char> -> Dictionary.Dict -> char -> coord -> Direction -> Boolean =
+        fun tiles dict c coordinate dir ->
+            if Map.containsKey (coordPlusDir coordinate (perpendicularDir dir)) tiles || Map.containsKey (coordPlusDir coordinate (oppositeDir (perpendicularDir dir))) tiles
+            then
+                match Dictionary.step c dict with
+                | Some (_, dict') -> checkDirectionBack tiles dict' (coordPlusDir coordinate (perpendicularDir dir)) coordinate (perpendicularDir dir)
+                | None -> false // Should never happen
+            else true
     
     // Used to find a valid move (except the first move of the game)
     // Right now returns the first valid word it finds
@@ -147,36 +186,20 @@ module internal ScrabblePlays =
                 | Some (b, dict') ->  // Reached end of word
                     if b && hasPlaced // Valid word is found using at least one tile from the hand -> return 
                     then Some []
-                    else 
-                        match aux hand dict' originalCoordinate (oppositeDir dir) hasPlaced with
-                        | Some xs -> Some xs
-                        | None ->
-                            MultiSet.fold (fun acc ch _ -> // Fold through tiles on hand, checking if they can be used to form a valid word
-                                match acc with
-                                | Some x -> Some x
-                                | None ->
-                                    match Dictionary.step (idToChar ch pieces) dict' with 
-                                    | Some (b, dict') ->
-                                        if b
-                                        then Some [coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))] // Valid word is found
-                                        else
-                                            match aux (MultiSet.removeSingle ch hand) dict' (coordPlusDir cd dir) dir true with // Remove used tile from hand and continue looking for next letter to form valid word?
-                                            | Some xs -> Some ((coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))) :: xs)
-                                            | None -> acc
-                                    | None -> acc
-                            ) None hand
+                    else aux hand dict' originalCoordinate (oppositeDir dir) hasPlaced
                 | None -> // Not reached end of word
                     MultiSet.fold (fun acc ch _ -> // Fold through tiles on hand, checking if they can be used to form a valid word
                         match acc with
                         | Some x -> Some x
                         | None ->
-                            match Dictionary.step (idToChar ch pieces) dict with 
+                            match Dictionary.step (idToChar ch pieces) dict with
                             | Some (b, dict') ->
-                                if b
-                                then Some [coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))] // Valid word is found
+                                if b && checkDirections tiles orgDict (idToChar ch pieces) (coordPlusDir cd dir) dir
+                                then Some [coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))] // Place a new tile
                                 else
-                                    match aux (MultiSet.removeSingle ch hand) dict' (coordPlusDir cd dir) dir true with // Remove used tile from hand and continue looking for next letter to form valid word?
-                                    | Some xs -> Some ((coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))) :: xs)
+                                    match aux (MultiSet.removeSingle ch hand) dict' (coordPlusDir cd dir) dir true with // Place a new tile
+                                    | Some xs when checkDirections tiles orgDict (idToChar ch pieces) (coordPlusDir cd dir) dir -> Some ((coordPlusDir cd dir, (ch, (idToChar ch pieces, idToPoints ch pieces))) :: xs)
+                                    | Some _ -> None
                                     | None -> acc
                             | None -> acc
                         ) None hand
@@ -186,7 +209,7 @@ module internal ScrabblePlays =
         | Some (_, dict') -> 
             [aux hand dict' originalCoordinate Direction.LEFT false; aux hand dict' originalCoordinate Direction.UP false;] // Tries to find one valid word in direction left and one valid word in direction up
         | None -> []
-        |> List.fold (fun acc word -> // Appends found words to a list?
+        |> List.fold (fun acc word -> // Removes occurences of "None" in list
             match word with
             | Some w -> w :: acc
             | None -> acc
