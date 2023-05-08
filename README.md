@@ -15,7 +15,7 @@ Enable or disable debug prints on line 22 in `Program.fs`
 ### Achieved
 - Finish a game on infinite board
 - Multi-player and dictionary
-  - To play multiplayer, comment in line 58 in `Program.fs` and comment out line 57 
+  - To play disable or enable multi-player, comment in/out line 57, 58, 59 in `Program.fs` 
 ### Not achieved
 - Playing on all boards
 - Parallelism
